@@ -2,9 +2,8 @@ import { useState, useEffect } from "react";
 import API from "../servicios/api";
 
 
-function PedidoForm() {
+function PedidoForm({ onOrderAdded }) {
   const [form, setForm] = useState({
-    cliente: "",
     nombre: "",
     telefono: "",
     direccion: "",
@@ -15,20 +14,8 @@ function PedidoForm() {
     comentario: ""
   });
 
-  const [usuarios, setUsuarios] = useState([]);
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    const fetchUsuarios = async () => {
-      try {
-        const response = await API.get("/usuarios");
-        setUsuarios(response.data);
-      } catch (error) {
-        console.error("Error al obtener usuarios:", error);
-      }
-    };
-    fetchUsuarios();
-  }, []);
+  const [showModal, setShowModal] = useState(false);
 
   const handleChange = (e) => {
     setForm({
@@ -61,10 +48,31 @@ function PedidoForm() {
     e.preventDefault();
     try {
       setLoading(true);
-      await API.post("/pedidos", form);
-      alert("Pedido guardado correctamente");
+
+      // Decodificar JWT para obtener el ID de usuario
+      const token = localStorage.getItem("token");
+      if (!token) {
+        alert("No estás autenticado, por favor inicia sesión de nuevo.");
+        return;
+      }
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+      
+      const payloadObj = JSON.parse(jsonPayload);
+      const userId = payloadObj.sub;
+
+      // Inyectamos el cliente (userId decodificado) en el objeto a enviar
+      const pedidoAEnviar = {
+        ...form,
+        cliente: userId
+      };
+
+      await API.post("/pedidos", pedidoAEnviar);
+      setShowModal(true); // Mostrar modal en lugar de alert
       setForm({
-        cliente: "",
         nombre: "",
         telefono: "",
         direccion: "",
@@ -74,6 +82,10 @@ function PedidoForm() {
         pagado: [],
         comentario: ""
       });
+      // ✅ Si se pasó la función, la llamamos para actualizar la lista
+      if (onOrderAdded) {
+        onOrderAdded();
+      }
     // eslint-disable-next-line no-unused-vars
     } catch (error) {
       alert("Error al guardar");
@@ -84,34 +96,38 @@ function PedidoForm() {
 
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-100 to-blue-200 flex items-center justify-center p-6">
-      <div className="bg-white shadow-2xl rounded-2xl w-full max-w-2xl p-8">
+    <div className="w-full h-full relative">
+      <div className="bg-white shadow-2xl rounded-2xl w-full p-8">
         
+        {/* Modal de Éxito */}
+        {showModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm transition-opacity">
+            <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-auto transform transition-all text-center">
+              <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-6">
+                <svg className="h-10 w-10 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">¡Pedido Registrado!</h3>
+              <p className="text-gray-500 mb-6">
+                Tu pedido ha sido guardado exitosamente en el sistema.
+              </p>
+              <button
+                onClick={() => setShowModal(false)}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-4 rounded-xl shadow-md transition-colors duration-200"
+              >
+                Aceptar y Continuar
+              </button>
+            </div>
+          </div>
+        )}
+
         <h2 className="text-3xl font-bold text-gray-800 mb-6 text-center">
           📦 Registro de Pedido
         </h2>
 
 
         <form onSubmit={handleSubmit} className="space-y-5">
-
-          {/* Cliente */}
-          <div>
-            <label className="block font-medium mb-1">Cliente (Usuario)</label>
-            <select
-              name="cliente"
-              value={form.cliente}
-              onChange={handleChange}
-              required
-              className="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="">Seleccione un cliente...</option>
-              {usuarios.map((usuario) => (
-                <option key={usuario._id} value={usuario._id}>
-                  {usuario.username}
-                </option>
-              ))}
-            </select>
-          </div>
 
           {/* Nombre */}
           <div>
