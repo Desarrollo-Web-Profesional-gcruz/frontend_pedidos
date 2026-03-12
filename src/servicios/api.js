@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: "http://localhost:3001/api/v1"
+  baseURL: "https://backendpedidos-gusmendez3249s-projects.vercel.app/api/v1/"
 });
 
 // Interceptor para agregar token a todas las peticiones
